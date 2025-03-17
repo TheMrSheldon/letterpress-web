@@ -2,7 +2,6 @@
 	export const ssr = false;
 
 	import { onMount } from 'svelte';
-	import type { Action } from 'svelte/action';
 
 	import { getDocument, GlobalWorkerOptions, version } from 'pdfjs-dist';
 	GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.mjs`;

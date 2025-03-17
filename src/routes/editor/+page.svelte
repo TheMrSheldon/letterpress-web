@@ -1,25 +1,9 @@
 <script lang="ts">
-	export const ssr = false;
-
 	import { Pane, Splitpanes } from 'svelte-splitpanes';
 	import Editor from '$lib/components/editor.svelte';
 	import PDFViewer from '$lib/components/pdfviewer.svelte';
 	import Logs from '$lib/components/logs.svelte';
-
-	var tmp = 2;
 </script>
-
-<!--div class="flex flex-col h-full" style="overflow: hidden;">
-	<div
-		id="pcontent"
-		class="grow overflow-y-auto gap-1 bg-gray-50 dark:bg-gray-700"
-		style="display: grid;"
-	>
-		<Editor></Editor>
-		<PDFViewer url="helloworld.pdf" settings={{ fillWidth: true, scale: tmp }}></PDFViewer>
-		<Logs></Logs>
-	</div>
-</div-->
 
 <Splitpanes style="overflow: hidden;" horizontal theme="lptheme">
 	<Pane>
@@ -27,7 +11,7 @@
 			<!--Pane>Explorer</Pane-->
 			<Pane size={60} class="flex"><Editor /></Pane>
 			<Pane size={40} class="flex"
-				><PDFViewer url="helloworld.pdf" settings={{ fillWidth: true, scale: tmp }} /></Pane
+				><PDFViewer url="helloworld.pdf" settings={{ fillWidth: true, scale: 2 }} /></Pane
 			>
 		</Splitpanes>
 	</Pane>
