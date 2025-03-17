@@ -15,10 +15,10 @@
 	onMount(() => {
 		getDocument(url).promise.then((pdf) => {
 			pageCount = pdf.numPages;
-			for (var i = 1; i < 10; i++) {
+			for (var i = 0; i < Math.min(10, pdf.numPages); i++) {
 				let canvas = document.createElement('canvas') as HTMLCanvasElement;
 				container.appendChild(canvas);
-				pdf.getPage(i).then((page) => {
+				pdf.getPage(i + 1).then((page) => {
 					const viewport = page.getViewport({ scale: settings.scale });
 					const context = canvas.getContext('2d')!;
 					canvas.height = viewport.height;
