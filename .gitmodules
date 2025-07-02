@@ -1,0 +1,3 @@
+[submodule "letterpress-wasm/letterpress"]
+	path = letterpress-wasm/qpdf-wasm
+	url = https://github.com/neslinesli93/qpdf-wasm.git
