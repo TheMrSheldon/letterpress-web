@@ -1,0 +1,1 @@
+cmake --build ./build --target letterpress_wasm

@@ -1,0 +1,1 @@
+Use https://github.com/neslinesli93/qpdf-wasm/blob/master/build.sh to build and install libjpeg and zlib with emscripten

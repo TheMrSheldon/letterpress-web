@@ -3,8 +3,22 @@
 	import Editor from '$lib/components/editor.svelte';
 	import PDFViewer from '$lib/components/pdfviewer.svelte';
 	import Logs from '$lib/components/logs.svelte';
+	import { onMount } from 'svelte';
+
+	let add: ((a: int, b: int) => number) | undefined;
+	let sub: ((a: int, b: int) => number) | undefined;
+
+	onMount(() => {
+		WebAssembly.instantiateStreaming(fetch('calc.wasm')).then((result) => {
+			add = result.instance.exports.add;
+			sub = result.instance.exports.sub;
+			console.log(add(1, 2));
+			console.log(sub(2, 1));
+		});
+	});
 </script>
 
+{add(1, 2)}; {sub(2, 1)}
 <Splitpanes style="overflow: hidden;" horizontal theme="lptheme">
 	<Pane>
 		<Splitpanes theme="lptheme">
