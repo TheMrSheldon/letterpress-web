@@ -1,0 +1,47 @@
+--- a/libqpdf/CMakeLists.txt
++++ b/libqpdf/CMakeLists.txt
+@@ -150,7 +150,7 @@ if(EXTERNAL_LIBS)
+   endif()
+ endif()
+
+-if(NOT EXTERNAL_LIBS)
++if(NOT EXTERNAL_LIBS AND NOT EMSCRIPTEN)
+   pkg_check_modules(pc_zlib zlib)
+   if(pc_zlib_FOUND)
+     list(APPEND dep_include_directories ${pc_zlib_INCLUDEDIR})
+@@ -169,7 +169,7 @@ if(NOT EXTERNAL_LIBS)
+   endif()
+ endif()
+
+-if(NOT EXTERNAL_LIBS)
++if(NOT EXTERNAL_LIBS AND NOT EMSCRIPTEN)
+   pkg_check_modules(pc_libjpeg libjpeg)
+   if(pc_libjpeg_FOUND)
+     list(APPEND dep_include_directories ${pc_libjpeg_INCLUDEDIR})
+@@ -192,6 +192,10 @@ endif()
+
+ # Update JPEG_INCLUDE in PARENT_SCOPE after we have finished setting it.
+ set(JPEG_INCLUDE ${JPEG_INCLUDE} PARENT_SCOPE)
++if(EMSCRIPTEN)
++    # jpeglib.h will be provided by -sUSE_LIBJPEG=1; clear the host-system path
++    set(JPEG_INCLUDE "" PARENT_SCOPE)
++endif()
+
+ # Crypto provider selection. Prefer external crypto providers. If
+ # implicit selection is allowed, use native only when no other options
+@@ -313,6 +317,15 @@ endif()
+ list(REMOVE_DUPLICATES dep_include_directories)
+ list(REMOVE_DUPLICATES dep_link_directories)
+ list(REMOVE_DUPLICATES dep_link_libraries)
++if(EMSCRIPTEN)
++    # Strip host system includes -- they conflict with Emscripten's sysroot
++    list(FILTER dep_include_directories EXCLUDE REGEX "^/usr/include$")
++    # Replace native zlib/libjpeg/openssl libs with Emscripten port flags
++    list(FILTER dep_link_libraries EXCLUDE REGEX "^(z|jpeg|ssl|crypto)$")
++    list(APPEND dep_link_libraries "-sUSE_ZLIB=1" "-sUSE_LIBJPEG=1")
++    # Make zlib.h / jpeglib.h available via the Emscripten port system at compile time
++    add_compile_options("-sUSE_ZLIB=1" "-sUSE_LIBJPEG=1")
++endif()
+
+ check_type_size(size_t SIZEOF_SIZE_T)
+ check_include_file("inttypes.h" HAVE_INTTYPES_H)

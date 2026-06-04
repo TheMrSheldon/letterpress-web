@@ -1,0 +1,9 @@
+--- a/src/letterpress/document/document.cpp
++++ b/src/letterpress/document/document.cpp
+@@ -66,6 +66,7 @@ void Document::pushFont(std::string path) noexcept {
+ 	static const std::filesystem::path fontdirs[] = {"/usr/share/fonts", "/usr/local/share/fonts"};
+ 	for (const auto& dir : fontdirs) {
++		if (!std::filesystem::is_directory(dir)) continue;
+ 		for (auto file : std::filesystem::recursive_directory_iterator(dir)) {
+ 			if (!file.is_regular_file() || file.path().stem() != path)
+ 				continue;

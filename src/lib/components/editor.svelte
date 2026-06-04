@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
+	import { pendingLoad, registerContentProvider, saveFile, openFile } from '$lib/filesystem';
+	import { compileCurrentDocument } from '$lib/compiler';
 
 	let editor: Monaco.editor.IStandaloneCodeEditor;
 	let monaco: typeof Monaco;
 	let editorContainer: HTMLElement;
+	let unsubLoad: (() => void) | undefined;
 
 	let defaultdoc = `\
 import standard
@@ -52,10 +55,26 @@ praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 		});
 		editor.getModel()?.setValue(defaultdoc);
 
-		// TODO: call editor.layout(); on resize and set automaticLayout to false
+		registerContentProvider(() => editor.getValue());
+
+		// Apply any file that was opened via the header buttons.
+		unsubLoad = pendingLoad.subscribe((content) => {
+			if (content !== null && editor) {
+				editor.getModel()?.setValue(content);
+				pendingLoad.set(null);
+			}
+		});
+
+		// Ctrl+S / Cmd+S to save.
+		editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => saveFile());
+		// Ctrl+O / Cmd+O to open.
+		editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyO, () => openFile());
+		// Ctrl+B / Cmd+B to build.
+		editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB, () => compileCurrentDocument());
 	});
 
 	onDestroy(() => {
+		unsubLoad?.();
 		monaco?.editor.getModels().forEach((model) => model.dispose());
 		editor?.dispose();
 	});

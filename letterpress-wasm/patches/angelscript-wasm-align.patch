@@ -1,0 +1,19 @@
+--- a/angelscript/include/angelscript.h
++++ b/angelscript/include/angelscript.h
+@@ -100,6 +100,20 @@
+ #ifdef __LP64__
+ typedef unsigned int  asDWORD;
+ typedef unsigned long asQWORD;
+ typedef long asINT64;
++#elif defined(__EMSCRIPTEN__)
++// WASM32: pointers and asDWORD are 32-bit, but asQWORD/asINT64 are 64-bit.
++// The AngelScript VM stores 64-bit values on its 32-bit-aligned stack, so
++// every *(asQWORD*) dereference is potentially misaligned.  aligned(1) tells
++// Clang the type may live at any alignment → emits i64.load/store align=1
++// instead of align=8, preventing WASM alignment traps throughout the VM.
++typedef unsigned long asDWORD;
++typedef uint64_t __attribute__((aligned(1), __may_alias__)) asQWORD;
++typedef int64_t __attribute__((aligned(1), __may_alias__)) asINT64;
+ #else
+ typedef unsigned long asDWORD;
+ #if !defined(_MSC_VER) && (defined(__GNUC__) || defined(__MWERKS__) || defined(__SUNPRO_CC) || defined(__psp2__))

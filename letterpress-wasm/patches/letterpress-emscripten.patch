@@ -1,0 +1,11 @@
+--- a/src/letterpress/document/hyphenation.cpp
++++ b/src/letterpress/document/hyphenation.cpp
+@@ -24,7 +24,7 @@ void Hyphenation::addPattern(const std::string& pattern) noexcept {
+
+ std::vector<std::string> Hyphenation::hyphenate(std::string word) const noexcept {
+ 	word = '.' + word + '.';
+-	uint8_t nums[word.length() + 2] = {0};
++	std::vector<uint8_t> nums(word.length() + 2, 0);
+ 	for (int length = 1; length <= maxPatternLen; ++length) {
+ 		for (auto start = 0; start + length <= word.length(); start++) {
+ 			auto substr = word.substr(start, length);

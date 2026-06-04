@@ -8,7 +8,7 @@ apt install -y less man-db sudo
 
 # Install Node and Emscripten
 apt-get install -y nodejs npm
-apt-get install -y emscripten cmake git gcc-multilib
+apt-get install -y emscripten cmake git gcc-multilib wget
 
 # Dependencies of libqpdf
 apt-get -y install autoconf pkg-config

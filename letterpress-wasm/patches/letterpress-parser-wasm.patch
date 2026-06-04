@@ -1,0 +1,26 @@
+--- a/include/letterpress/parser/parser.hpp
++++ b/include/letterpress/parser/parser.hpp
+@@ -93,9 +93,21 @@ namespace lp {
+ 		size_t lookAheadMatches(const std::regex& regex) noexcept {
+-			auto begin = ParserLookAheadIter(0, this);
+-			auto end = ParserLookAheadIter();
+-			std::match_results<ParserLookAheadIter> m;
+-			bool match = std::regex_search(begin, end, m, regex, std::regex_constants::match_continuous);
+-			return match ? m.length() : 0;
++			// libc++ std::regex_search with bidirectional iterators calls std::distance(begin,end)
++			// internally, iterating until begin==end.  Our end sentinel (parser==nullptr) never
++			// compares equal to a live begin iterator, so this loops until the heap is exhausted.
++			// Fix: snapshot the lookahead buffer into a std::string and use the string overload,
++			// which uses random-access iterators and avoids the infinite-iteration problem.
++			static const size_t CHUNK = 4096;
++			for (size_t i = lookAheadBuffer.size(); i < CHUNK; ++i) {
++				char c;
++				stream.read(&c, 1);
++				if (!stream) break;
++				lookAheadBuffer.push_back(c);
++			}
++			std::string view(lookAheadBuffer.begin(), lookAheadBuffer.end());
++			std::smatch m;
++			bool match = std::regex_search(view, m, regex, std::regex_constants::match_continuous);
++			return match ? (size_t)m.length() : 0;
+ 		}

@@ -6,6 +6,13 @@ node_modules
 /.svelte-kit
 /build
 
+# Compiled WASM (delete static/letterpress_wasm.js to force rebuild, see letterpress-wasm/build.sh)
+/static/*.wasm
+/static/letterpress_wasm.js
+/static/letterpress_wasm.data
+/letterpress-wasm/build
+/letterpress-wasm/assets/
+
 # OS
 .DS_Store
 Thumbs.db
