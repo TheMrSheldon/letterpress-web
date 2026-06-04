@@ -3,13 +3,12 @@ import { browser } from '$app/environment';
 import { base } from '$app/paths';
 import { getContent } from '$lib/filesystem';
 
-export const pdfObjectUrl = writable<string | null>(null);
+export const pdfBytes = writable<Uint8Array | null>(null);
 export const compileError = writable<string | null>(null);
 export const compiling = writable(false);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _lpModule: any = null;
-let _prevObjectUrl: string | null = null;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function loadModule(): Promise<any> {
@@ -52,10 +51,7 @@ export async function compileCurrentDocument(): Promise<void> {
 		}
 
 		const bytes = mod.FS.readFile('/output.pdf') as Uint8Array<ArrayBuffer>;
-		if (_prevObjectUrl) URL.revokeObjectURL(_prevObjectUrl);
-		const blob = new Blob([bytes], { type: 'application/pdf' });
-		_prevObjectUrl = URL.createObjectURL(blob);
-		pdfObjectUrl.set(_prevObjectUrl);
+		pdfBytes.set(bytes);
 	} catch (e) {
 		compileError.set(String(e));
 	} finally {

@@ -8,6 +8,7 @@
 	let monaco: typeof Monaco;
 	let editorContainer: HTMLElement;
 	let unsubLoad: (() => void) | undefined;
+	let compileTimer: ReturnType<typeof setTimeout> | null = null;
 
 	let defaultdoc = `\
 import standard
@@ -71,9 +72,19 @@ praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 		editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyO, () => openFile());
 		// Ctrl+B / Cmd+B to build.
 		editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB, () => compileCurrentDocument());
+
+		// Auto-recompile 50 ms after the last keystroke.
+		editor.onDidChangeModelContent(() => {
+			if (compileTimer) clearTimeout(compileTimer);
+			compileTimer = setTimeout(() => compileCurrentDocument(), 50);
+		});
+
+		// Build once on initial load so the viewer shows the default document.
+		compileCurrentDocument();
 	});
 
 	onDestroy(() => {
+		if (compileTimer) clearTimeout(compileTimer);
 		unsubLoad?.();
 		monaco?.editor.getModels().forEach((model) => model.dispose());
 		editor?.dispose();
