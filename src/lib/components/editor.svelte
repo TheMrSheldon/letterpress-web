@@ -1,50 +1,18 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
-	import { pendingLoad, registerContentProvider, saveFile, openFile } from '$lib/filesystem';
+	import { pendingLoad, registerContentProvider } from '$lib/filesystem';
 	import { compileCurrentDocument } from '$lib/compiler';
+	import { activeFileName, projectFiles, updateFileContent } from '$lib/project';
+	import { get } from 'svelte/store';
 
 	let editor: Monaco.editor.IStandaloneCodeEditor;
 	let monaco: typeof Monaco;
 	let editorContainer: HTMLElement;
 	let unsubLoad: (() => void) | undefined;
 	let compileTimer: ReturnType<typeof setTimeout> | null = null;
+	let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-	let defaultdoc = `\
-import standard
-doctype Essay {
-	papersize: a4,
-	fontsize: 12,
-	title: "A Simple Example",
-	author: [ "Jane Doe", "John Everyman" ],
-	institute: [ "Institute A", "Institute B" ],
-	date: "\\today"
-}
-==
-
-\\maketitle
-
-\\section{A Section Heading}
-Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore
-magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd
-gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing
-elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et
-accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit
-amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et
-dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd
-gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
-
-Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat
-nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis
-dolore te feugait nulla facilisi. Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh
-euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.
-
-
-\\paragraph{A paragraph} Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut
-aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie
-consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit
-praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
-`;
 
 	onMount(async () => {
 		monaco = (await import('../monaco')).default;
@@ -54,11 +22,15 @@ praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 			automaticLayout: true,
 			language: 'letterpress'
 		});
-		editor.getModel()?.setValue(defaultdoc);
+
+		// Load the active project file's content as the initial document.
+		const initialName = get(activeFileName);
+		const initialContent =
+			get(projectFiles).find((f) => f.name === initialName)?.content ?? '';
+		editor.getModel()?.setValue(initialContent);
 
 		registerContentProvider(() => editor.getValue());
 
-		// Apply any file that was opened via the header buttons.
 		unsubLoad = pendingLoad.subscribe((content) => {
 			if (content !== null && editor) {
 				editor.getModel()?.setValue(content);
@@ -66,17 +38,19 @@ praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 			}
 		});
 
-		// Ctrl+S / Cmd+S to save.
-		editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => saveFile());
-		// Ctrl+O / Cmd+O to open.
-		editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyO, () => openFile());
 		// Ctrl+B / Cmd+B to build.
 		editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB, () => compileCurrentDocument());
 
-		// Auto-recompile 50 ms after the last keystroke.
+		// Auto-recompile 50 ms after the last keystroke; auto-save to project store after 500 ms.
 		editor.onDidChangeModelContent(() => {
 			if (compileTimer) clearTimeout(compileTimer);
 			compileTimer = setTimeout(() => compileCurrentDocument(), 50);
+
+			if (saveTimer) clearTimeout(saveTimer);
+			saveTimer = setTimeout(() => {
+				const name = get(activeFileName);
+				if (name) updateFileContent(name, editor.getValue());
+			}, 500);
 		});
 
 		// Build once on initial load so the viewer shows the default document.
@@ -85,6 +59,7 @@ praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 
 	onDestroy(() => {
 		if (compileTimer) clearTimeout(compileTimer);
+		if (saveTimer) clearTimeout(saveTimer);
 		unsubLoad?.();
 		monaco?.editor.getModels().forEach((model) => model.dispose());
 		editor?.dispose();
