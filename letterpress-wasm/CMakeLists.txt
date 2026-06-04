@@ -18,6 +18,12 @@ add_link_options(-fwasm-exceptions)
 # types at call-time, causing RuntimeError: function signature mismatch.
 add_compile_definitions(AS_MAX_PORTABILITY)
 
+# Build everything as static libraries.  Emscripten produces a single self-
+# contained WASM module; shared libraries (.so) require dynamic linking which
+# is experimental in WASM and causes wasm-ld to fail when it can't find
+# soname-versioned .so files (e.g. libqpdf.so.29.9.1) in its sysroot path.
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libraries for WASM" FORCE)
+
 ########################################################################################################################
 # LOAD CPM                                                                                                             #
 ########################################################################################################################
@@ -64,7 +70,7 @@ CPMAddPackage(
 )
 
 
-CPMAddPackage(URI "gh:TheMrSheldon/letterpress#master" EXCLUDE_FROM_ALL YES OPTIONS "LP_BUILD_DOCS OFF")
+CPMAddPackage(URI "gh:TheMrSheldon/letterpress#7e47107" EXCLUDE_FROM_ALL YES OPTIONS "LP_BUILD_DOCS OFF")
 
 # Workarounds for letterpress + spdlog 1.14 + clang 18 (Emscripten 5.x):
 target_compile_definitions(letterpress PRIVATE

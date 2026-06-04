@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
+import { base } from '$app/paths';
 import { getContent } from '$lib/filesystem';
 
 export const pdfObjectUrl = writable<string | null>(null);
@@ -18,14 +19,14 @@ async function loadModule(): Promise<any> {
 	if (!(window as Window & { LetterPress?: unknown }).LetterPress) {
 		await new Promise<void>((resolve, reject) => {
 			const s = document.createElement('script');
-			s.src = '/letterpress_wasm.js';
+			s.src = base + '/letterpress_wasm.js';
 			s.onload = () => resolve();
 			s.onerror = () => reject(new Error('Failed to load letterpress_wasm.js'));
 			document.head.appendChild(s);
 		});
 	}
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	_lpModule = await (window as any).LetterPress({ locateFile: (f: string) => '/' + f });
+	_lpModule = await (window as any).LetterPress({ locateFile: (f: string) => base + '/' + f });
 	return _lpModule;
 }
 

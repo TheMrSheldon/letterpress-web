@@ -1,7 +1,6 @@
 --- a/angelscript/include/angelscript.h
 +++ b/angelscript/include/angelscript.h
-@@ -100,6 +100,20 @@
- #ifdef __LP64__
+@@ -101,6 +101,15 @@
  typedef unsigned int  asDWORD;
  typedef unsigned long asQWORD;
  typedef long asINT64;

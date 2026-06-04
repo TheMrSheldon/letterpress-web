@@ -12,6 +12,24 @@ PARSER_PATCH="$SCRIPT_DIR/patches/letterpress-parser-wasm.patch"
 EMSDK_DIR="${EMSDK:-${EMSDK_DIR:-$HOME/emsdk}}"
 ASSETS_DIR="$SCRIPT_DIR/assets"
 
+# Apply a patch, tolerating "already applied" (exit 1 from --forward) but
+# failing loudly on real errors (exit 2: context mismatch, file not found, etc.).
+_apply_patch() {
+    local label="$1" src="$2" patchfile="$3"
+    echo "Applying $label..."
+    patch --forward -p1 -d "$src" -i "$patchfile" || {
+        local rc=$?
+        if [ "$rc" -eq 1 ]; then
+            echo "  Already applied (skipped)."
+        else
+            echo "ERROR: patch $patchfile failed with exit code $rc" >&2
+            exit 1
+        fi
+        return 0
+    }
+    echo "  Applied."
+}
+
 # Ensure a recent Emscripten is available (emsdk preferred; apt fallback).
 # The apt package on Ubuntu 22.04 is 3.1.6 which lacks C++23 support.
 _setup_emsdk() {
@@ -47,40 +65,45 @@ fi
 
 echo "Using: $(emcc --version 2>/dev/null | head -1)"
 
-# First configure pass: downloads all dependencies (including qpdf)
-echo "Configuring WASM build (pass 1: downloading dependencies)..."
-emcmake cmake -S "$SCRIPT_DIR" -B "$BUILD_DIR"
-
-# Apply Emscripten compatibility patches to downloaded sources.
-# Done outside CMake because CPM can't re-apply patches to already-patched source.
-QPDF_SRC="$BUILD_DIR/_deps/qpdf-src"
-if [ -d "$QPDF_SRC" ]; then
-    echo "Applying Emscripten patch to qpdf..."
-    patch --forward -p1 -d "$QPDF_SRC" -i "$QPDF_PATCH" || true
-else
-    echo "WARNING: qpdf source not found at $QPDF_SRC, skipping patch"
+# Pre-download and patch qpdf before cmake ever sees it.
+# qpdf's libqpdf/CMakeLists.txt unconditionally overwrites EXTERNAL_LIBS with a
+# Windows-only check, so no CMake cache variable can prevent its pkg-config
+# discovery from running.  The fix (AND NOT EMSCRIPTEN) must be present before
+# the first cmake configure pass.  We download qpdf, apply the patch, then pass
+# FETCHCONTENT_SOURCE_DIR_QPDF so cmake uses our pre-patched copy.
+QPDF_PREDOWN="$BUILD_DIR/qpdf-predownload"
+if [ ! -d "$QPDF_PREDOWN" ]; then
+    mkdir -p "$BUILD_DIR"
+    echo "Pre-downloading qpdf v11.9.1..."
+    git clone --quiet --depth 1 --branch v11.9.1 https://github.com/qpdf/qpdf.git "$QPDF_PREDOWN"
 fi
+_apply_patch "Emscripten patch to qpdf" "$QPDF_PREDOWN" "$QPDF_PATCH"
+
+# First configure pass: downloads remaining dependencies (letterpress, angelscript).
+# qpdf is provided pre-patched via FETCHCONTENT_SOURCE_DIR_QPDF.
+echo "Configuring WASM build (pass 1: downloading dependencies)..."
+emcmake cmake -S "$SCRIPT_DIR" -B "$BUILD_DIR" \
+    -DFETCHCONTENT_SOURCE_DIR_QPDF="$QPDF_PREDOWN"
 
 LP_SRC="$BUILD_DIR/_deps/letterpress-src"
 if [ -d "$LP_SRC" ]; then
-    echo "Applying Emscripten patch to letterpress..."
-    patch --forward -p1 -d "$LP_SRC" -i "$LP_PATCH" || true
-    echo "Applying AngelScript generic-calling patch to letterpress..."
-    patch --forward -p1 -d "$LP_SRC" -i "$AS_PATCH" || true
-    echo "Applying document pushFont safety patch..."
-    patch --forward -p1 -d "$LP_SRC" -i "$DOC_PATCH" || true
-    echo "Applying parser regex WASM fix..."
-    patch --forward -p1 -d "$LP_SRC" -i "$PARSER_PATCH" || true
+    _apply_patch "Emscripten patch to letterpress"        "$LP_SRC" "$LP_PATCH"
+    _apply_patch "AngelScript generic-calling patch"      "$LP_SRC" "$AS_PATCH"
+    _apply_patch "document pushFont safety patch"         "$LP_SRC" "$DOC_PATCH"
+    _apply_patch "parser regex WASM fix"                  "$LP_SRC" "$PARSER_PATCH"
 else
-    echo "WARNING: letterpress source not found at $LP_SRC, skipping patch"
+    echo "ERROR: letterpress source not found at $LP_SRC" >&2
+    exit 1
 fi
 
 AS_SRC="$BUILD_DIR/_deps/angelscript-src"
 if [ -d "$AS_SRC" ]; then
-    echo "Applying WASM alignment fix to AngelScript..."
-    patch --forward -p1 -d "$AS_SRC" -i "$ASALIGN_PATCH" || true
+    # angelscript_2.37.0.zip uses CRLF; convert the header to LF so patch can match context lines.
+    sed -i 's/\r//' "$AS_SRC/angelscript/include/angelscript.h"
+    _apply_patch "WASM alignment fix to AngelScript" "$AS_SRC" "$ASALIGN_PATCH"
 else
-    echo "WARNING: AngelScript source not found at $AS_SRC, skipping patch"
+    echo "ERROR: AngelScript source not found at $AS_SRC" >&2
+    exit 1
 fi
 
 # Download Computer Modern fonts used by letterpress (same source as letterpress's Dockerfile).
@@ -94,9 +117,9 @@ _download_font() {
     fi
     echo "Downloading $name..."
     if command -v wget &>/dev/null; then
-        wget -q "$url" -O "$ASSETS_DIR/fonts/$name"
+        wget -q --timeout=30 --tries=3 "$url" -O "$ASSETS_DIR/fonts/$name"
     elif command -v curl &>/dev/null; then
-        curl -sSL "$url" -o "$ASSETS_DIR/fonts/$name"
+        curl -sSL --max-time 30 --retry 3 "$url" -o "$ASSETS_DIR/fonts/$name"
     elif command -v python3 &>/dev/null; then
         python3 -c "import urllib.request; urllib.request.urlretrieve('$url', '$ASSETS_DIR/fonts/$name')"
     else
