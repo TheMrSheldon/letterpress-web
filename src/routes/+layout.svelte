@@ -2,6 +2,7 @@
 	import '../app.postcss';
 	import { AppShell, AppBar } from '@skeletonlabs/skeleton';
 	import { activeFileName } from '$lib/project';
+	import { base } from '$app/paths';
 
 	// Highlight JS
 	import hljs from 'highlight.js/lib/core';
@@ -31,7 +32,7 @@
 		<!-- App Bar -->
 		<AppBar>
 			<svelte:fragment slot="lead">
-				<a href="/" class="text-xl font-bold uppercase hover:opacity-80 transition-opacity">Letterpress</a>
+				<a href="{base}/" class="text-xl font-bold uppercase hover:opacity-80 transition-opacity">Letterpress</a>
 				{#if $activeFileName}
 					<span class="ml-3 text-sm text-surface-300 font-mono">{$activeFileName}</span>
 				{/if}
