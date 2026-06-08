@@ -4,11 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="$SCRIPT_DIR/build"
 QPDF_PATCH="$SCRIPT_DIR/patches/qpdf-emscripten.patch"
-LP_PATCH="$SCRIPT_DIR/patches/letterpress-emscripten.patch"
 AS_PATCH="$SCRIPT_DIR/patches/letterpress-angelscript-wasm.patch"
 ASALIGN_PATCH="$SCRIPT_DIR/patches/angelscript-wasm-align.patch"
-DOC_PATCH="$SCRIPT_DIR/patches/letterpress-document-wasm.patch"
-PARSER_PATCH="$SCRIPT_DIR/patches/letterpress-parser-wasm.patch"
 EMSDK_DIR="${EMSDK:-${EMSDK_DIR:-$HOME/emsdk}}"
 ASSETS_DIR="$SCRIPT_DIR/assets"
 
@@ -87,10 +84,7 @@ emcmake cmake -S "$SCRIPT_DIR" -B "$BUILD_DIR" \
 
 LP_SRC="$BUILD_DIR/_deps/letterpress-src"
 if [ -d "$LP_SRC" ]; then
-    _apply_patch "Emscripten patch to letterpress"        "$LP_SRC" "$LP_PATCH"
-    _apply_patch "AngelScript generic-calling patch"      "$LP_SRC" "$AS_PATCH"
-    _apply_patch "document pushFont safety patch"         "$LP_SRC" "$DOC_PATCH"
-    _apply_patch "parser regex WASM fix"                  "$LP_SRC" "$PARSER_PATCH"
+    _apply_patch "AngelScript generic-calling patch" "$LP_SRC" "$AS_PATCH"
 else
     echo "ERROR: letterpress source not found at $LP_SRC" >&2
     exit 1

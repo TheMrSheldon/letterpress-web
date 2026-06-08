@@ -31,7 +31,7 @@
 		<!-- App Bar -->
 		<AppBar>
 			<svelte:fragment slot="lead">
-				<strong class="text-xl uppercase">Letterpress</strong>
+				<a href="/" class="text-xl font-bold uppercase hover:opacity-80 transition-opacity">Letterpress</a>
 				{#if $activeFileName}
 					<span class="ml-3 text-sm text-surface-300 font-mono">{$activeFileName}</span>
 				{/if}

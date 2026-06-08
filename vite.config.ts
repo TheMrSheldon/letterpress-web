@@ -9,6 +9,6 @@ export default defineConfig({
 		target: 'esnext'
 	},
 	optimizeDeps: {
-		exclude: ['mupdf']
+		exclude: ['mupdf', '@sqlite.org/sqlite-wasm']
 	}
 });

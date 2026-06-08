@@ -44,7 +44,10 @@
   "type": "module",
   "dependencies": {
     "@floating-ui/dom": "1.6.13",
+    "@sqlite.org/sqlite-wasm": "^3.46.1-build1",
     "highlight.js": "11.11.1",
+    "idb": "^8.0.3",
+    "idb-keyval": "^6.2.5",
     "monaco-editor": "^0.52.2",
     "mupdf": "^1.27.0",
     "svelte-splitpanes": "^8.0.9"

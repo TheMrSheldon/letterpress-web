@@ -70,7 +70,7 @@ CPMAddPackage(
 )
 
 
-CPMAddPackage(URI "gh:TheMrSheldon/letterpress#7e47107" EXCLUDE_FROM_ALL YES OPTIONS "LP_BUILD_DOCS OFF")
+CPMAddPackage(URI "gh:TheMrSheldon/letterpress#29e4566b4089ddda6c3a11e073558a496bbb4956" EXCLUDE_FROM_ALL YES OPTIONS "LP_BUILD_DOCS OFF")
 
 # Workarounds for letterpress + spdlog 1.14 + clang 18 (Emscripten 5.x):
 target_compile_definitions(letterpress PRIVATE

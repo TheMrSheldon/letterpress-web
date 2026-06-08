@@ -1,10 +1,27 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
+	import { get } from 'svelte/store';
 	import { Pane, Splitpanes } from 'svelte-splitpanes';
 	import Editor from '$lib/components/editor.svelte';
 	import PDFViewer from '$lib/components/pdfviewer.svelte';
 	import Logs from '$lib/components/logs.svelte';
 	import Explorer from '$lib/components/explorer.svelte';
+	import { projectReady, setActiveProject, currentProjectId } from '$lib/project';
+
+	onMount(async () => {
+		// Wait for the store layer to finish seeding / loading from the DB.
+		await projectReady;
+
+		// If the URL's project differs from what is currently loaded (e.g. the
+		// user navigated here directly via a bookmark), load the correct one.
+		const urlProjectId = $page.params.projectId;
+		if (urlProjectId !== get(currentProjectId)) {
+			await setActiveProject(urlProjectId);
+		}
+	});
 </script>
+
 <Splitpanes style="overflow: hidden;" horizontal theme="lptheme">
 	<Pane>
 		<Splitpanes theme="lptheme">
@@ -123,10 +140,6 @@
 		width: 100%;
 		height: 100%;
 		overflow: hidden;
-		/** Add also a direct child selector, for dealing with specifity of nested splitpanes transition.
-    This issue was happening in the examples on nested splitpanes, vertical inside horizontal.
-    I think it's better to keep also the previous CSS selector for (potential) old browser compatibility.
-  */
 	}
 	:global(.splitpanes--vertical) :global(.splitpanes__pane) {
 		transition: width 0.2s ease-out;

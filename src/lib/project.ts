@@ -1,18 +1,23 @@
+/**
+ * Svelte reactive layer for the data API.
+ *
+ * This file is the only place in the UI codebase that imports from $lib/db.
+ * It translates async data-API calls into Svelte stores and coordinates
+ * editor-specific concerns (pendingLoad, default seeding, active-project
+ * persistence).
+ *
+ * Nothing here is imported by src/lib/db/ — the dependency arrow is one-way.
+ */
+
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
-import { pendingLoad } from './filesystem';
+import { pendingLoad } from '$lib/filesystem';
+import * as db from '$lib/db';
 
-export interface ProjectFile {
-	name: string;
-	content: string;
-}
+// ---------------------------------------------------------------------------
+// Default document content (seeded into the demo project on first run)
+// ---------------------------------------------------------------------------
 
-interface ProjectState {
-	files: ProjectFile[];
-	activeFileName: string | null;
-}
-
-// Default document for a fresh project.
 const DEFAULT_CONTENT = `\
 import standard
 doctype Essay {
@@ -49,109 +54,146 @@ consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan 
 praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
 `;
 
-const STORAGE_KEY = 'lp:demo:files';
+const DEMO_PROJECT_ID = 'demo';
+const LS_ACTIVE_PROJECT = 'lp:project';
 
-const DEFAULT_STATE: ProjectState = {
-	files: [{ name: 'main.lp', content: DEFAULT_CONTENT }],
-	activeFileName: 'main.lp'
-};
+// ---------------------------------------------------------------------------
+// In-memory state — source of truth for Svelte reactivity
+// ---------------------------------------------------------------------------
 
-function loadState(): ProjectState {
-	if (!browser) return DEFAULT_STATE;
-	try {
-		const raw = localStorage.getItem(STORAGE_KEY);
-		if (!raw) return DEFAULT_STATE;
-		const parsed = JSON.parse(raw) as ProjectState;
-		if (!Array.isArray(parsed.files) || parsed.files.length === 0) return DEFAULT_STATE;
-		return parsed;
-	} catch {
-		return DEFAULT_STATE;
-	}
+interface EditorState {
+	projectId: string;
+	files: db.ProjectFile[];
+	activeFileName: string | null;
 }
 
-// ---------------------------------------------------------------------------
-// Internal state — all mutations go through the exported helpers below.
-// ---------------------------------------------------------------------------
-const _state = writable<ProjectState>(loadState());
-
-// Persist every state change to localStorage.
-_state.subscribe((s) => {
-	if (browser) localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+const _state = writable<EditorState>({
+	projectId: DEMO_PROJECT_ID,
+	files: [],
+	activeFileName: null
 });
 
 // ---------------------------------------------------------------------------
-// Public read-only derived stores
+// Public derived stores (read-only outside this module)
 // ---------------------------------------------------------------------------
 
-/** The ordered list of project files. */
 export const projectFiles = derived(_state, (s) => s.files);
-
-/** The name of the currently open file (null if no files exist). */
 export const activeFileName = derived(_state, (s) => s.activeFileName);
+export const currentProjectId = derived(_state, (s) => s.projectId);
+
+// Re-export the types so callers don't need to import from $lib/db directly.
+export type { Project, ProjectFile } from '$lib/db';
 
 // ---------------------------------------------------------------------------
-// Mutations
+// Initialisation — runs once at module load in the browser
 // ---------------------------------------------------------------------------
 
-/** Open a file: makes it active and signals the editor to load its content. */
+async function init() {
+	if (!browser) return;
+
+	// Seed the demo project on the very first run.
+	const demo = await db.getProject(DEMO_PROJECT_ID);
+	if (!demo) {
+		await db.createProject({ id: DEMO_PROJECT_ID, title: 'Demo Project', description: 'A simple Letterpress example.' });
+		await db.createFile(DEMO_PROJECT_ID, 'main.lp', DEFAULT_CONTENT);
+	}
+
+	// Load whichever project was open last (falling back to demo).
+	const storedId = localStorage.getItem(LS_ACTIVE_PROJECT) ?? DEMO_PROJECT_ID;
+	const project = await db.getProject(storedId);
+	const projectId = project ? storedId : DEMO_PROJECT_ID;
+
+	await _loadProject(projectId);
+}
+
+/** Load a project's files into the store and signal the editor. */
+async function _loadProject(projectId: string) {
+	const files = await db.listFiles(projectId);
+	const activeFileName = files[0]?.name ?? null;
+	_state.set({ projectId, files, activeFileName });
+	if (activeFileName) pendingLoad.set(files[0].content);
+}
+
+/** Resolves once the active project's files are loaded and the editor is ready. */
+export const projectReady: Promise<void> = init();
+
+// ---------------------------------------------------------------------------
+// File-level mutations
+// ---------------------------------------------------------------------------
+
 export function setActiveFile(name: string): void {
-	const state = get(_state);
-	const file = state.files.find((f) => f.name === name);
+	const { files } = get(_state);
+	const file = files.find((f) => f.name === name);
 	if (!file) return;
 	_state.update((s) => ({ ...s, activeFileName: name }));
 	pendingLoad.set(file.content);
 }
 
-/** Persist the current editor content for a named file (called by the editor on change). */
 export function updateFileContent(name: string, content: string): void {
+	const { projectId } = get(_state);
 	_state.update((s) => ({
 		...s,
 		files: s.files.map((f) => (f.name === name ? { ...f, content } : f))
 	}));
+	db.patchFile(projectId, name, { content });
 }
 
-/** Add a new empty file and open it immediately. No-op if the name already exists. */
 export function createFile(name: string): void {
-	if (get(_state).files.some((f) => f.name === name)) return;
-	_state.update((s) => ({
-		...s,
-		files: [...s.files, { name, content: '' }],
-		activeFileName: name
-	}));
+	const { projectId, files } = get(_state);
+	if (files.some((f) => f.name === name)) return;
+	const file: db.ProjectFile = { project: projectId, name, content: '' };
+	_state.update((s) => ({ ...s, files: [...s.files, file], activeFileName: name }));
 	pendingLoad.set('');
+	db.createFile(projectId, name, '');
 }
 
-/**
- * Delete a file. If it was the active file, the first remaining file is opened.
- * Opening the fallback file is deferred so the store update commits first.
- */
 export function deleteFile(name: string): void {
+	const { projectId } = get(_state);
 	_state.update((s) => {
 		const files = s.files.filter((f) => f.name !== name);
-		let activeFileName = s.activeFileName;
-
-		if (activeFileName === name) {
-			activeFileName = files[0]?.name ?? null;
-			const fallbackContent = files[0]?.content ?? '';
-			setTimeout(() => pendingLoad.set(fallbackContent), 0);
-		}
-
-		return { ...s, files, activeFileName };
+		const active = s.activeFileName === name ? (files[0]?.name ?? null) : s.activeFileName;
+		if (active !== s.activeFileName) setTimeout(() => pendingLoad.set(files[0]?.content ?? ''), 0);
+		return { ...s, files, activeFileName: active };
 	});
+	db.deleteFile(projectId, name);
 }
 
-/** Rename a file. No-op if newName already exists. Keeps the file active if it was. */
 export function renameFile(oldName: string, newName: string): void {
-	if (get(_state).files.some((f) => f.name === newName)) return;
+	const { projectId, files } = get(_state);
+	if (files.some((f) => f.name === newName)) return;
 	_state.update((s) => ({
 		...s,
 		files: s.files.map((f) => (f.name === oldName ? { ...f, name: newName } : f)),
 		activeFileName: s.activeFileName === oldName ? newName : s.activeFileName
 	}));
+	db.patchFile(projectId, oldName, { name: newName });
 }
 
-/** Return the currently active ProjectFile, or null. */
-export function getActiveFile(): ProjectFile | null {
-	const s = get(_state);
-	return s.files.find((f) => f.name === s.activeFileName) ?? null;
+export function getActiveFile(): db.ProjectFile | null {
+	const { files, activeFileName } = get(_state);
+	return files.find((f) => f.name === activeFileName) ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Project-level mutations (called from the overview page and PDF viewer)
+// ---------------------------------------------------------------------------
+
+export async function setActiveProject(projectId: string): Promise<void> {
+	await _loadProject(projectId);
+	if (browser) localStorage.setItem(LS_ACTIVE_PROJECT, projectId);
+}
+
+export async function createProject(title: string, description = ''): Promise<string> {
+	const project = await db.createProject({ title, description });
+	await db.createFile(project.id, 'main.lp', DEFAULT_CONTENT);
+	return project.id;
+}
+
+export async function getAllProjects(): Promise<db.Project[]> {
+	return db.listProjects();
+}
+
+/** Called by the PDF viewer to persist the first-page thumbnail. */
+export async function updateProjectPreview(projectId: string, image: Blob): Promise<void> {
+	await db.patchProject(projectId, { previewImage: image });
 }

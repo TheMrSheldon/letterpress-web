@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
+	import { get } from 'svelte/store';
 	import { pdfBytes, compileError, compiling, compileCurrentDocument } from '$lib/compiler';
+	import { currentProjectId, updateProjectPreview } from '$lib/project';
 
 	export let settings: { fillWidth: boolean; scale: number };
 
@@ -240,12 +242,56 @@
 		});
 		resizeObserver.observe(scrollEl);
 
-		if (currentBytes) renderPdf(currentBytes);
+		if (currentBytes) {
+			renderPdf(currentBytes);
+			updatePreviewImage(currentBytes);
+		}
 	});
+
+	// Render page 0 at a fixed thumbnail scale and persist it as the project preview.
+	async function updatePreviewImage(bytes: Uint8Array) {
+		try {
+			const mupdf = await getMupdf();
+			const doc = mupdf.Document.openDocument(bytes, 'application/pdf');
+			if (doc.countPages() === 0) { doc.destroy(); return; }
+
+			const page = doc.loadPage(0);
+			const THUMB_SCALE = 0.5; // ~297 × 421 px for A4
+			const pixmap = page.toPixmap(
+				mupdf.Matrix.scale(THUMB_SCALE, THUMB_SCALE),
+				mupdf.ColorSpace.DeviceRGB,
+				false
+			);
+			const w = pixmap.getWidth();
+			const h = pixmap.getHeight();
+			const rgb: Uint8ClampedArray = pixmap.getPixels();
+			const rgba = new Uint8ClampedArray(w * h * 4);
+			for (let p = 0, q = 0; p < rgb.length; p += 3, q += 4) {
+				rgba[q] = rgb[p]; rgba[q + 1] = rgb[p + 1]; rgba[q + 2] = rgb[p + 2]; rgba[q + 3] = 255;
+			}
+			pixmap.destroy();
+			page.destroy();
+			doc.destroy();
+
+			const canvas = document.createElement('canvas');
+			canvas.width = w;
+			canvas.height = h;
+			canvas.getContext('2d')!.putImageData(new ImageData(rgba, w, h), 0, 0);
+
+			canvas.toBlob((blob) => {
+				if (blob) updateProjectPreview(get(currentProjectId), blob);
+			}, 'image/png');
+		} catch {
+			// Non-critical — silently skip on any mupdf error.
+		}
+	}
 
 	const unsubBytes = pdfBytes.subscribe((bytes) => {
 		currentBytes = bytes;
-		if (bytes && mounted) renderPdf(bytes);
+		if (bytes && mounted) {
+			renderPdf(bytes);
+			updatePreviewImage(bytes);
+		}
 	});
 
 	onDestroy(() => {
@@ -263,7 +309,7 @@
 
 <div
 	style="display: grid; grid-template-rows: auto 1fr; overflow: hidden;"
-	class="w-full bg-gray-50 dark:bg-gray-700"
+	class="w-full h-full bg-gray-50 dark:bg-gray-700"
 >
 	<!-- Toolbar -->
 	<div class="px-3 py-2 border-b border-gray-200 dark:border-gray-600 pl-0">

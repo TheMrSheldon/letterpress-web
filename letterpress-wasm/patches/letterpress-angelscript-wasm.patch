@@ -1,5 +1,5 @@
---- a/src/letterpress/scriptengine/scriptengine.cpp	2026-06-03 21:42:33.206001254 +0000
-+++ b/src/letterpress/scriptengine/scriptengine.cpp	2026-06-03 21:43:26.364587005 +0000
+--- a/src/letterpress/scriptengine/scriptengine.cpp
++++ b/src/letterpress/scriptengine/scriptengine.cpp
 @@ -42,6 +42,46 @@
  
  void loginfo(spdlog::logger* logger, std::string msg) { logger->info(msg); }
