@@ -1,7 +1,14 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { getAllProjects, createProject, setActiveProject, projectReady, type Project } from '$lib/project';
+	import {
+		getAllProjects,
+		createProject,
+		setActiveProject,
+		projectReady,
+		type Project
+	} from '$lib/project';
+	import { base } from '$app/paths';
 
 	let projects: Project[] = [];
 	let loading = true;
@@ -35,7 +42,7 @@
 
 	async function openProject(project: Project) {
 		await setActiveProject(project.id);
-		goto(`/editor/${project.id}`);
+		goto(`${base}/editor/${project.id}`);
 	}
 
 	async function handleCreate() {
@@ -44,7 +51,7 @@
 		submitting = true;
 		const id = await createProject(title, newDescription.trim());
 		await setActiveProject(id);
-		goto(`/editor/${id}`);
+		goto(`${base}/editor/${id}`);
 	}
 
 	function cancelForm() {
@@ -54,13 +61,15 @@
 	}
 
 	function onFormKey(e: KeyboardEvent) {
-		if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCreate(); }
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			handleCreate();
+		}
 		if (e.key === 'Escape') cancelForm();
 	}
 </script>
 
 <div class="min-h-full bg-gray-900 text-gray-100 p-8">
-
 	<!-- Page header -->
 	<div class="max-w-6xl mx-auto">
 		<div class="flex items-center justify-between mb-8">
@@ -70,10 +79,18 @@
 			</div>
 			<button
 				class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors"
-				on:click={() => { showForm = true; }}
+				on:click={() => {
+					showForm = true;
+				}}
 			>
 				<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-					<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14"/>
+					<path
+						stroke="currentColor"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M12 5v14M5 12h14"
+					/>
 				</svg>
 				New project
 			</button>
@@ -82,7 +99,9 @@
 		<!-- New-project form -->
 		{#if showForm}
 			<div class="mb-8 bg-gray-800 border border-gray-700 rounded-xl p-6 max-w-lg">
-				<h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">New project</h2>
+				<h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
+					New project
+				</h2>
 				<div class="space-y-3">
 					<div>
 						<label class="block text-xs text-gray-400 mb-1" for="new-title">Title</label>
@@ -135,8 +154,10 @@
 				<p class="text-gray-500 text-sm mb-4">No projects yet.</p>
 				<button
 					class="text-indigo-400 hover:text-indigo-300 text-sm transition-colors"
-					on:click={() => { showForm = true; }}
-				>Create your first project →</button>
+					on:click={() => {
+						showForm = true;
+					}}>Create your first project →</button
+				>
 			</div>
 		{:else}
 			<ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
@@ -147,7 +168,10 @@
 							on:click={() => openProject(project)}
 						>
 							<!-- Preview image — A4 aspect ratio -->
-							<div class="relative w-full bg-gray-900 overflow-hidden" style="aspect-ratio: 210 / 297;">
+							<div
+								class="relative w-full bg-gray-900 overflow-hidden"
+								style="aspect-ratio: 210 / 297;"
+							>
 								{#if previewUrls[project.id]}
 									<img
 										src={previewUrls[project.id]}
@@ -172,7 +196,9 @@
 
 							<!-- Card footer -->
 							<div class="px-4 py-3">
-								<p class="text-sm font-semibold text-gray-100 truncate group-hover:text-white transition-colors">
+								<p
+									class="text-sm font-semibold text-gray-100 truncate group-hover:text-white transition-colors"
+								>
 									{project.title}
 								</p>
 								{#if project.description}
